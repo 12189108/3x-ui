@@ -25,6 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
+          sudo apt-get install -y upx-ucl
           if [ "${{ matrix.platform }}" == "arm64" ]; then
             sudo apt install gcc-aarch64-linux-gnu
           elif [ "${{ matrix.platform }}" == "armv7" ]; then
@@ -70,6 +71,7 @@ jobs:
           
           mkdir x-ui
           cp xui-release x-ui/
+          
           cp x-ui.service x-ui/
           cp x-ui.sh x-ui/
           mv x-ui/xui-release x-ui/x-ui
@@ -116,7 +118,12 @@ jobs:
           wget -O geosite_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geosite.dat
           mv xray xray-linux-${{ matrix.platform }}
           cd ../..
-          
+
+      - name: Compress binaries
+        run: |
+          upx --best --lzma x-ui/x-ui
+          upx --best --lzma x-ui/bin/xray-linux-${{ matrix.platform }}
+
       - name: Package
         run: tar -zcvf x-ui-linux-${{ matrix.platform }}.tar.gz x-ui
 
