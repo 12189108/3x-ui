@@ -51,7 +51,9 @@ jobs:
           export CGO_ENABLED=1
           export GOOS=freebsd
           export GOARCH="amd64"
-          export CC="gcc --sysroot=/opt/freebsd-sysroot"
+          export CC="gcc --sysroot=/opt/freebsd-sysroot -D__FreeBSD__"
+          export CFLAGS="--sysroot=/opt/freebsd-sysroot -I/opt/freebsd-sysroot/usr/include"
+          export LDFLAGS="--sysroot=/opt/freebsd-sysroot -L/opt/freebsd-sysroot/usr/lib"
           if [ "${{ matrix.platform }}" == "arm64" ]; then
             export GOARCH=arm64
             export CC=aarch64-linux-gnu-gcc
