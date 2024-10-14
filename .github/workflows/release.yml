@@ -41,6 +41,7 @@ jobs:
 
       - name: Build x-ui
         run: |
+          export CGO_ENABLED=0
           export GOOS=freebsd
           export GOARCH="amd64"
           if [ "${{ matrix.platform }}" == "arm64" ]; then
