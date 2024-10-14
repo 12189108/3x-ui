@@ -40,11 +40,18 @@ jobs:
             sudo apt install gcc-s390x-linux-gnu
           fi
 
+      - name: Download FreeBSD sysroot
+        run: |
+          wget https://download.freebsd.org/ftp/releases/amd64/14.1-RELEASE/base.txz
+          mkdir -p /opt/freebsd-sysroot
+          tar -xf base.txz -C /opt/freebsd-sysroot
+          
       - name: Build x-ui
         run: |
           export CGO_ENABLED=1
           export GOOS=freebsd
           export GOARCH="amd64"
+          export CC="gcc --sysroot=/opt/freebsd-sysroot"
           if [ "${{ matrix.platform }}" == "arm64" ]; then
             export GOARCH=arm64
             export CC=aarch64-linux-gnu-gcc
