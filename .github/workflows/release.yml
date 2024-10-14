@@ -41,6 +41,7 @@ jobs:
 
       - name: Build x-ui
         run: |
+          set -e
           export CGO_ENABLED=1
           export GOOS=freebsd
           export GOARCH=${{ matrix.platform }}
