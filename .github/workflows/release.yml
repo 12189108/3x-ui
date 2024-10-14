@@ -25,6 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
+          sudo apt install gcc gcc-multilib
           if [ "${{ matrix.platform }}" == "arm64" ]; then
             sudo apt install gcc-aarch64-linux-gnu
           elif [ "${{ matrix.platform }}" == "armv7" ]; then
