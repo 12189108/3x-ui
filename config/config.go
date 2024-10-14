@@ -74,7 +74,7 @@ func GetDBPath() string {
 func GetLogFolder() string {
 	logFolderPath := os.Getenv("XUI_LOG_FOLDER")
 	if logFolderPath == "" {
-		logFolderPath = "/var/log"
+		logFolderPath = "./log"
 	}
 	return logFolderPath
 }
