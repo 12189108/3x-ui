@@ -1,10 +1,9 @@
 name: Release 3X-UI
 
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - "v*.*.*"
+    branches:
+      - main 
 
 jobs:
   build:
@@ -12,12 +11,7 @@ jobs:
       matrix:
         platform:
           - amd64
-          - arm64
-          - armv7
-          - armv6
-          - 386
-          - armv5
-          - s390x
+          
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repository
@@ -48,7 +42,7 @@ jobs:
       - name: Build x-ui
         run: |
           export CGO_ENABLED=1
-          export GOOS=linux
+          export GOOS=freebsd
           export GOARCH=${{ matrix.platform }}
           if [ "${{ matrix.platform }}" == "arm64" ]; then
             export GOARCH=arm64
@@ -136,7 +130,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
+          tag: v1.0
           file: x-ui-linux-${{ matrix.platform }}.tar.gz
           asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
           prerelease: true
