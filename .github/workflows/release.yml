@@ -48,6 +48,7 @@ jobs:
           fail-if-no-assets: false
           assets: |
             x-ui-linux-*.tar.gz
+        continue-on-error: true
 
   build:
     needs: delete_assets
