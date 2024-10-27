@@ -66,6 +66,7 @@ jobs:
           prepare: |
             pkg install -y wget curl zip unzip 
             curl -O https://golang.google.cn/dl/go1.23.2.freebsd-amd64.tar.gz
+            ls
             rm -rf /usr/local/go && tar -C /usr/local -xzf go1.23.2.freebsd-amd64.tar.gz
             export PATH=$PATH:/usr/local/go/bin
             source $HOME/.profile
