@@ -14,7 +14,6 @@ import (
 	"github.com/mhsanaei/3x-ui/v2/config"
 	"github.com/mhsanaei/3x-ui/v2/database"
 	"github.com/mhsanaei/3x-ui/v2/logger"
-	"github.com/mhsanaei/3x-ui/v2/sub"
 	"github.com/mhsanaei/3x-ui/v2/util/crypto"
 	"github.com/mhsanaei/3x-ui/v2/web"
 	"github.com/mhsanaei/3x-ui/v2/web/global"
@@ -59,15 +58,6 @@ func runWebServer() {
 		return
 	}
 
-	var subServer *sub.Server
-	subServer = sub.NewServer()
-	global.SetSubServer(subServer)
-	err = subServer.Start()
-	if err != nil {
-		log.Fatalf("Error starting sub server: %v", err)
-		return
-	}
-
 	sigCh := make(chan os.Signal, 1)
 	// Trap shutdown signals
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGTERM)
@@ -86,11 +76,6 @@ func runWebServer() {
 			if err != nil {
 				logger.Debug("Error stopping web server:", err)
 			}
-			err = subServer.Stop()
-			if err != nil {
-				logger.Debug("Error stopping sub server:", err)
-			}
-
 			server = web.NewServer()
 			global.SetWebServer(server)
 			err = server.Start()
@@ -99,23 +84,12 @@ func runWebServer() {
 				return
 			}
 			log.Println("Web server restarted successfully.")
-
-			subServer = sub.NewServer()
-			global.SetSubServer(subServer)
-			err = subServer.Start()
-			if err != nil {
-				log.Fatalf("Error restarting sub server: %v", err)
-				return
-			}
-			log.Println("Sub server restarted successfully.")
-
 		default:
 			// --- FIX FOR TELEGRAM BOT CONFLICT (409) on full shutdown ---
 			service.StopBot()
 			// ------------------------------------------------------------
 
 			server.Stop()
-			subServer.Stop()
 			log.Println("Shutting down servers.")
 			return
 		}
