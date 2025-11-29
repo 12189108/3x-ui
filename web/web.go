@@ -396,8 +396,27 @@ func (s *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
-	listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
-	listener, err := net.Listen("tcp", listenAddr)
+	var listener net.Listener
+	if port == 0 {
+		// 监听 Unix socket
+		socketPath := "/var/run/3x-ui.sock" // 或从配置读取
+		// 如果 socket 文件已存在,先删除
+		os.Remove(socketPath)
+		listener, err = net.Listen("unix", socketPath)
+		if err != nil {
+			return err
+		}
+		// 设置 socket 文件权限
+		os.Chmod(socketPath, 0660)
+	} else {
+		// 监听 TCP 端口
+		targetPort := strconv.Itoa(port)
+		listenAddr := net.JoinHostPort(listen, targetPort)
+		listener, err = net.Listen("tcp", listenAddr)
+		if err != nil {
+			return err
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -409,13 +428,25 @@ func (s *Server) Start() (err error) {
 			}
 			listener = network.NewAutoHttpsListener(listener)
 			listener = tls.NewListener(listener, c)
-			logger.Info("Web server running HTTPS on", listener.Addr())
+			if port == 0 {
+				logger.Info("Web server running HTTPS on unix socket /var/run/3x-ui.sock")
+			} else {
+				logger.Info("Web server running HTTPS on", listener.Addr())
+			}
 		} else {
 			logger.Error("Error loading certificates:", err)
-			logger.Info("Web server running HTTP on", listener.Addr())
+			if port == 0 {
+				logger.Info("Web server running HTTP on unix socket /var/run/3x-ui.sock")
+			} else {
+				logger.Info("Web server running HTTP on", listener.Addr())
+			}
 		}
 	} else {
-		logger.Info("Web server running HTTP on", listener.Addr())
+		if port == 0 {
+			logger.Info("Web server running HTTP on unix socket /var/run/3x-ui.sock")
+		} else {
+			logger.Info("Web server running HTTP on", listener.Addr())
+		}
 	}
 	s.listener = listener
 

@@ -276,7 +276,7 @@ check_config() {
 }
 
 set_port() {
-    echo -n "Enter port number[1-65535]: "
+    echo -n "Enter port number[0-65535]: "
     read -r port
     if [[ -z "${port}" ]]; then
         LOGD "Cancelled"

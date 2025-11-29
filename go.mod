@@ -1,6 +1,6 @@
 module github.com/mhsanaei/3x-ui/v2
 
-go 1.25.4
+go 1.25.1
 
 require (
 	github.com/gin-contrib/gzip v1.2.5

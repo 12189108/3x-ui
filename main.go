@@ -80,8 +80,8 @@ func runWebServer() {
 
 			// --- FIX FOR TELEGRAM BOT CONFLICT (409): Stop bot before restart ---
 			service.StopBot()
-			// --			
-			
+			// --
+
 			err := server.Stop()
 			if err != nil {
 				logger.Debug("Error stopping web server:", err)
@@ -113,7 +113,7 @@ func runWebServer() {
 			// --- FIX FOR TELEGRAM BOT CONFLICT (409) on full shutdown ---
 			service.StopBot()
 			// ------------------------------------------------------------
-			
+
 			server.Stop()
 			subServer.Stop()
 			log.Println("Shutting down servers.")
@@ -258,7 +258,7 @@ func updateSetting(port int, username string, password string, webBasePath strin
 	settingService := service.SettingService{}
 	userService := service.UserService{}
 
-	if port > 0 {
+	if port > -1 {
 		err := settingService.SetPort(port)
 		if err != nil {
 			fmt.Println("Failed to set port:", err)
@@ -277,7 +277,7 @@ func updateSetting(port int, username string, password string, webBasePath strin
 	}
 
 	if webBasePath != "" {
-		err := settingService.SetBasePath(webBasePath)
+		err := settingService.SetBasePath("")
 		if err != nil {
 			fmt.Println("Failed to set base URI path:", err)
 		} else {
