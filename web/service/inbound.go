@@ -50,7 +50,6 @@ func (s *InboundService) GetInbounds(userId int) ([]*model.Inbound, error) {
 			email := strings.ToLower(inbound.ClientStats[i].Email)
 			if c, ok := cMap[email]; ok {
 				inbound.ClientStats[i].UUID = c.ID
-				inbound.ClientStats[i].SubId = c.SubID
 			}
 		}
 	}
@@ -80,7 +79,6 @@ func (s *InboundService) GetAllInbounds() ([]*model.Inbound, error) {
 			email := strings.ToLower(inbound.ClientStats[i].Email)
 			if c, ok := cMap[email]; ok {
 				inbound.ClientStats[i].UUID = c.ID
-				inbound.ClientStats[i].SubId = c.SubID
 			}
 		}
 	}
@@ -2017,7 +2015,6 @@ func (s *InboundService) GetClientTrafficTgBot(tgId int64) ([]*xray.ClientTraffi
 		if ct, client, e := s.GetClientByEmail(traffics[i].Email); e == nil && ct != nil && client != nil {
 			traffics[i].Enable = client.Enable
 			traffics[i].UUID = client.ID
-			traffics[i].SubId = client.SubID
 		}
 	}
 
@@ -2034,7 +2031,6 @@ func (s *InboundService) GetClientTrafficByEmail(email string) (traffic *xray.Cl
 	if t != nil && client != nil {
 		t.Enable = client.Enable
 		t.UUID = client.ID
-		t.SubId = client.SubID
 		return t, nil
 	}
 	return nil, nil
@@ -2076,7 +2072,6 @@ func (s *InboundService) GetClientTrafficByID(id string) ([]xray.ClientTraffic, 
 		if ct, client, e := s.GetClientByEmail(traffics[i].Email); e == nil && ct != nil && client != nil {
 			traffics[i].Enable = client.Enable
 			traffics[i].UUID = client.ID
-			traffics[i].SubId = client.SubID
 		}
 	}
 	return traffics, err
