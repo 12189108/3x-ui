@@ -91,53 +91,29 @@ config_after_install() {
         fi
     done
 
-    if [[ ${#existing_webBasePath} -lt 4 ]]; then
-        if [[ "$existing_hasDefaultCredential" == "true" ]]; then
-            local config_webBasePath=$(gen_random_string 18)
-            local config_username=$(gen_random_string 10)
-            local config_password=$(gen_random_string 10)
-
-            read -rp "Would you like to customize the Panel Port settings? (If not, a random port will be applied) [y/n]: " config_confirm
-            if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
-                read -rp "Please set up the panel port: " config_port
-                echo -e "${yellow}Your Panel Port is: ${config_port}${plain}"
-            else
-                local config_port=$(shuf -i 1024-62000 -n 1)
-                echo -e "${yellow}Generated random port: ${config_port}${plain}"
-            fi
-
-            /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}" -port "${config_port}" -webBasePath "${config_webBasePath}"
-            echo -e "This is a fresh installation, generating random login info for security concerns:"
-            echo -e "###############################################"
-            echo -e "${green}Username: ${config_username}${plain}"
-            echo -e "${green}Password: ${config_password}${plain}"
-            echo -e "${green}Port: ${config_port}${plain}"
-            echo -e "${green}WebBasePath: ${config_webBasePath}${plain}"
-            echo -e "${green}Access URL: http://${server_ip}:${config_port}/${config_webBasePath}${plain}"
-            echo -e "###############################################"
+    # Keep the configured path, including / and short custom paths.
+    existing_webBasePath=${existing_webBasePath:-/}
+    if [[ "$existing_hasDefaultCredential" == "true" ]]; then
+        local config_username=$(gen_random_string 10)
+        local config_password=$(gen_random_string 10)
+        local config_port
+        read -rp "Would you like to customize the Panel Port settings? (If not, a random port will be applied) [y/n]: " config_confirm
+        if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
+            read -rp "Please set up the panel port: " config_port
         else
-            local config_webBasePath=$(gen_random_string 18)
-            echo -e "${yellow}WebBasePath is missing or too short. Generating a new one...${plain}"
-            /usr/local/x-ui/x-ui setting -webBasePath "${config_webBasePath}"
-            echo -e "${green}New WebBasePath: ${config_webBasePath}${plain}"
-            echo -e "${green}Access URL: http://${server_ip}:${existing_port}/${config_webBasePath}${plain}"
+            config_port=$(shuf -i 1024-62000 -n 1)
         fi
+        /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}" -port "${config_port}"
+        existing_port=${config_port}
+        echo -e "Generated new random login credentials:"
+        echo -e "${green}Username: ${config_username}${plain}"
+        echo -e "${green}Password: ${config_password}${plain}"
+        echo -e "${green}Port: ${existing_port}${plain}"
     else
-        if [[ "$existing_hasDefaultCredential" == "true" ]]; then
-            local config_username=$(gen_random_string 10)
-            local config_password=$(gen_random_string 10)
-
-            echo -e "${yellow}Default credentials detected. Security update required...${plain}"
-            /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}"
-            echo -e "Generated new random login credentials:"
-            echo -e "###############################################"
-            echo -e "${green}Username: ${config_username}${plain}"
-            echo -e "${green}Password: ${config_password}${plain}"
-            echo -e "###############################################"
-        else
-            echo -e "${green}Username, Password, and WebBasePath are properly set. Exiting...${plain}"
-        fi
+        echo -e "${green}Keeping existing panel credentials, port, and web base path.${plain}"
     fi
+    echo -e "${green}WebBasePath: ${existing_webBasePath}${plain}"
+    echo -e "${green}Access URL: http://${server_ip}:${existing_port}${existing_webBasePath}${plain}"
 
     /usr/local/x-ui/x-ui migrate
 }

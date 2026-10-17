@@ -452,6 +452,7 @@
 {{template "component/aThemeSwitch" .}}
 {{template "component/aCustomStatistic" .}}
 {{template "modals/textModal"}}
+{{template "modals/twoFactorModal"}}
 <script>
   // Tiny Sparkline component using an inline SVG polyline
   Vue.component('sparkline', {
@@ -740,6 +741,13 @@
     },
   };
 
+  const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
   const logModal = {
     visible: false,
     logs: [],
@@ -763,24 +771,26 @@
         if (index > 0) formattedLogs += '<br>';
 
         if (parts.length === 3) {
-          const d = parts[0];
-          const t = parts[1];
-          const level = parts[2];
-          const levelIndex = levels.indexOf(level, levels) || 5;
+          const d = escapeHtml(parts[0]);
+          const t = escapeHtml(parts[1]);
+          const level = escapeHtml(parts[2]);
+          const idx = levels.indexOf(parts[2]);
+          const levelIndex = idx >= 0 ? idx : 5;
 
           //formattedLogs += `<span style="color: gray;">${index + 1}.</span>`;
           formattedLogs += `<span style="color: ${levelColors[0]};">${d} ${t}</span> `;
           formattedLogs += `<span style="color: ${levelColors[levelIndex]}">${level}</span>`;
         } else {
-          const levelIndex = levels.indexOf(data, levels) || 5;
-          formattedLogs += `<span style="color: ${levelColors[levelIndex]}">${data}</span>`;
+          const idx = levels.indexOf(data);
+          const levelIndex = idx >= 0 ? idx : 5;
+          formattedLogs += `<span style="color: ${levelColors[levelIndex]}">${escapeHtml(data)}</span>`;
         }
 
         if (message) {
           if (message.startsWith("XRAY:"))
-            message = "<b>XRAY: </b>" + message.substring(5);
+            message = "<b>XRAY: </b>" + escapeHtml(message.substring(5));
           else
-            message = "<b>X-UI: </b>" + message;
+            message = "<b>X-UI: </b>" + escapeHtml(message);
         }
 
         formattedLogs += message ? ' - ' + message : '';
@@ -830,7 +840,7 @@
     </tr>
 `;
 
-        logs.reverse().forEach((log, index) => {
+        logs.slice().reverse().forEach((log, index) => {
           let outboundColor = '';
           if (log.Event === 1) {
             outboundColor = ' style="color: #e04141;"'; //red for blocked
@@ -841,18 +851,18 @@
 
           let text = ``;
           if (log.Email !== "") {
-            text = `<td>${log.Email}</td>`;
+            text = `<td>${escapeHtml(log.Email)}</td>`;
           }
 
           const { locale, timeZone } = Intl.DateTimeFormat().resolvedOptions();
 
           formattedLogs += `
 <tr ${outboundColor}>
-    <td><b>${new Date(log.DateTime).toLocaleString(locale, { timeZone })}</b></td>
-    <td>${log.FromAddress}</td>
-    <td>${log.ToAddress}</td>
-    <td>${log.Inbound}</td>
-    <td>${log.Outbound}</td>
+    <td><b>${escapeHtml(new Date(log.DateTime).toLocaleString(locale, { timeZone }))}</b></td>
+    <td>${escapeHtml(log.FromAddress)}</td>
+    <td>${escapeHtml(log.ToAddress)}</td>
+    <td>${escapeHtml(log.Inbound)}</td>
+    <td>${escapeHtml(log.Outbound)}</td>
     ${text}
 </tr>
 `;
@@ -1069,8 +1079,37 @@
       openBackup() {
         backupModal.show();
       },
+      async withSecondFactor(action) {
+        const msg = await HttpUtil.post('/getTwoFactorEnable');
+        if (!msg.success) return;
+        if (msg.obj) {
+          twoFactorModal.show({
+            title: '{{ i18n "pages.settings.security.twoFactor" }}',
+            description: '{{ i18n "twoFactorCode" }}',
+            type: 'confirm',
+            confirm: (success, code) => { if (success) action(code); },
+          });
+        } else {
+          await action('');
+        }
+      },
       exportDatabase() {
-        window.location = basePath + 'panel/api/server/getDb';
+        this.withSecondFactor(async (code) => {
+          this.loading(true);
+          try {
+            const response = await axios.get('panel/api/server/getDb', {
+              responseType: 'blob', headers: { 'X-Two-Factor-Code': code },
+            });
+            if ((response.headers['content-type'] || '').includes('application/json')) {
+              const msg = JSON.parse(await response.data.text());
+              this.$message.error(msg.msg);
+              return;
+            }
+            FileManager.downloadTextFile(response.data, 'x-ui.db', { type: 'application/octet-stream' });
+          } finally {
+            this.loading(false);
+          }
+        });
       },
       importDatabase() {
         const fileInput = document.createElement('input');
@@ -1079,27 +1118,25 @@
         fileInput.addEventListener('change', async (event) => {
           const dbFile = event.target.files[0];
           if (dbFile) {
-            const formData = new FormData();
-            formData.append('db', dbFile);
-            backupModal.hide();
-            this.loading(true);
-            const uploadMsg = await HttpUtil.post('/panel/api/server/importDB', formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data',
+            this.withSecondFactor(async (code) => {
+              const formData = new FormData();
+              formData.append('db', dbFile);
+              backupModal.hide();
+              this.loading(true);
+              const uploadMsg = await HttpUtil.post('/panel/api/server/importDB', formData, {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                  'X-Two-Factor-Code': code,
+                }
+              });
+              this.loading(false);
+              if (!uploadMsg.success) {
+                return;
               }
-            });
-            this.loading(false);
-            if (!uploadMsg.success) {
-              return;
-            }
-            this.loading(true);
-            const restartMsg = await HttpUtil.post("/panel/setting/restartPanel");
-            this.loading(false);
-            if (restartMsg.success) {
               this.loading(true);
               await PromiseUtil.sleep(5000);
-              location.reload();
-            }
+              window.location.replace(basePath);
+            });
           }
         });
         fileInput.click();

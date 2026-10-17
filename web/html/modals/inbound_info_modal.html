@@ -300,27 +300,6 @@
           </td>
         </tr>
       </table>
-      <template v-if="app.subSettings.enable && infoModal.clientSettings.subId">
-        <a-divider>Subscription URL</a-divider>
-        <tr-info-row class="tr-info-row">
-          <tr-info-title class="tr-info-title">
-            <a-tag color="purple">Subscription Link</a-tag>
-            <a-tooltip title='{{ i18n "copy" }}'>
-              <a-button size="small" icon="snippets" @click="copy(infoModal.subLink)"></a-button>
-            </a-tooltip>
-          </tr-info-title>
-          <a :href="[[ infoModal.subLink ]]" target="_blank">[[ infoModal.subLink ]]</a>
-        </tr-info-row>
-        <tr-info-row class="tr-info-row" v-if="app.subSettings.subJsonEnable">
-          <tr-info-title class="tr-info-title">
-            <a-tag color="purple">Json Link</a-tag>
-            <a-tooltip title='{{ i18n "copy" }}'>
-              <a-button size="small" icon="snippets" @click="copy(infoModal.subJsonLink)"></a-button>
-            </a-tooltip>
-          </tr-info-title>
-          <a :href="[[ infoModal.subJsonLink ]]" target="_blank">[[ infoModal.subJsonLink ]]</a>
-        </tr-info-row>
-      </template>
       <template v-if="app.tgBotEnable && infoModal.clientSettings.tgId">
         <a-divider>Telegram ChatID</a-divider>
         <tr-info-row class="tr-info-row">
@@ -518,8 +497,6 @@
     links: [],
     index: null,
     isExpired: false,
-    subLink: '',
-    subJsonLink: '',
     clientIps: '',
     show(dbInbound, index) {
       this.index = index;
@@ -548,23 +525,11 @@
       } else {
         this.links = this.inbound.genAllLinks(this.dbInbound.remark, app.remarkModel, this.clientSettings);
       }
-      if (this.clientSettings) {
-        if (this.clientSettings.subId) {
-          this.subLink = this.genSubLink(this.clientSettings.subId);
-          this.subJsonLink = app.subSettings.subJsonEnable ? this.genSubJsonLink(this.clientSettings.subId) : '';
-        }
-      }
       this.visible = true;
     },
     close() {
       infoModal.visible = false;
     },
-    genSubLink(subID) {
-      return app.subSettings.subURI + subID;
-    },
-    genSubJsonLink(subID) {
-      return app.subSettings.subJsonURI + subID;
-    }
   };
   const infoModalApp = new Vue({
     delimiters: ['[[', ']]'],

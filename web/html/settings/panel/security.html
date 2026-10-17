@@ -36,7 +36,9 @@
             <template #title>{{ i18n "pages.settings.security.twoFactorEnable" }}</template>
             <template #description>{{ i18n "pages.settings.security.twoFactorEnableDesc" }}</template>
             <template #control>
-                <a-switch @click="toggleTwoFactor" :checked="allSetting.twoFactorEnable"></a-switch>
+                <a-switch @change="toggleTwoFactor" :checked="allSetting.twoFactorEnable"
+                    :loading="loadingStates.spinning" checked-children='{{ i18n "enable" }}'
+                    un-checked-children='{{ i18n "close" }}'></a-switch>
             </template>
         </a-setting-list-item>
     </a-collapse-panel>

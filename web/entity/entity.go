@@ -18,7 +18,7 @@ type Msg struct {
 	Obj     any    `json:"obj"`     // Optional data object
 }
 
-// AllSetting contains all configuration settings for the 3x-ui panel including web server, Telegram bot, and subscription settings.
+// AllSetting contains all configuration settings for the 3x-ui panel including web server and Telegram bot settings.
 type AllSetting struct {
 	// Web server settings
 	WebListen     string `json:"webListen" form:"webListen"`         // Web server listen IP address
@@ -75,7 +75,6 @@ type AllSetting struct {
 	LdapDefaultTotalGB    int    `json:"ldapDefaultTotalGB" form:"ldapDefaultTotalGB"`
 	LdapDefaultExpiryDays int    `json:"ldapDefaultExpiryDays" form:"ldapDefaultExpiryDays"`
 	LdapDefaultLimitIP    int    `json:"ldapDefaultLimitIP" form:"ldapDefaultLimitIP"`
-	// JSON subscription routing rules
 }
 
 // CheckValid validates all settings in the AllSetting struct, checking IP addresses, ports, SSL certificates, and other configuration values.

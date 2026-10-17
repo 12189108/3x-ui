@@ -9,7 +9,9 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v2/web/global"
 	"github.com/mhsanaei/3x-ui/v2/web/service"
+	"github.com/mhsanaei/3x-ui/v2/web/session"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -236,6 +238,9 @@ func (a *ServerController) getConfigJson(c *gin.Context) {
 
 // getDb downloads the database file.
 func (a *ServerController) getDb(c *gin.Context) {
+	if !a.checkSecondFactor(c) {
+		return
+	}
 	db, err := a.serverService.GetDb()
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.index.getDatabaseError"), err)
@@ -264,6 +269,9 @@ func isValidFilename(filename string) bool {
 
 // importDB imports a database file and restarts the Xray service.
 func (a *ServerController) importDB(c *gin.Context) {
+	if !a.checkSecondFactor(c) {
+		return
+	}
 	// Get the file from the request body
 	file, _, err := c.Request.FormFile("db")
 	if err != nil {
@@ -277,6 +285,16 @@ func (a *ServerController) importDB(c *gin.Context) {
 	// Import it
 	err = a.serverService.ImportDB(file)
 	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.index.importDatabaseError"), err)
+		return
+	}
+	session.ClearSession(c)
+	if err := sessions.Default(c).Save(); err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.index.importDatabaseError"), err)
+		return
+	}
+	panel := service.PanelService{}
+	if err := panel.RestartPanel(3 * time.Second); err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.index.importDatabaseError"), err)
 		return
 	}

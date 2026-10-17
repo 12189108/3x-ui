@@ -3,6 +3,7 @@ package controller
 import (
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 
 	"github.com/mhsanaei/3x-ui/v2/config"
@@ -14,18 +15,20 @@ import (
 
 // getRemoteIp extracts the real IP address from the request headers or remote address.
 func getRemoteIp(c *gin.Context) string {
-	value := c.GetHeader("X-Real-IP")
-	if value != "" {
-		return value
+	if ip, err := netip.ParseAddr(strings.TrimSpace(c.GetHeader("X-Real-IP"))); err == nil {
+		return ip.WithZone("").Unmap().String()
 	}
-	value = c.GetHeader("X-Forwarded-For")
-	if value != "" {
-		ips := strings.Split(value, ",")
-		return ips[0]
+	for _, value := range strings.Split(c.GetHeader("X-Forwarded-For"), ",") {
+		if ip, err := netip.ParseAddr(strings.TrimSpace(value)); err == nil {
+			return ip.WithZone("").Unmap().String()
+		}
 	}
 	addr := c.Request.RemoteAddr
 	ip, _, _ := net.SplitHostPort(addr)
-	return ip
+	if parsed, err := netip.ParseAddr(ip); err == nil {
+		return parsed.WithZone("").Unmap().String()
+	}
+	return "unknown"
 }
 
 // jsonMsg sends a JSON response with a message and error status.

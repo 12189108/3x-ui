@@ -1004,6 +1004,10 @@ func (s *ServerService) ImportDB(file multipart.File) error {
 		return common.NewErrorf("Error migrating db: %v", err)
 	}
 
+	if err := rotateRestoredSessionEpochs(); err != nil {
+		return common.NewErrorf("Failed to revoke sessions after database restore: %v", err)
+	}
+
 	s.inboundService.MigrateDB()
 
 	// Start Xray

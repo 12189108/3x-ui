@@ -78,7 +78,6 @@ var (
 	client_ExpiryTime   int64
 	client_Enable       bool
 	client_TgID         string
-	client_SubID        string
 	client_Comment      string
 	client_Reset        int
 	client_Security     string
@@ -702,20 +701,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 		if len(dataArray) >= 2 && len(dataArray[1]) > 0 {
 			email := dataArray[1]
 			switch dataArray[0] {
-			case "get_clients_for_sub":
-				inboundId := dataArray[1]
-				inboundIdInt, err := strconv.Atoi(inboundId)
-				if err != nil {
-					t.sendCallbackAnswerTgBot(callbackQuery.ID, err.Error())
-					return
-				}
-				clientsKB, err := t.getInboundClientsFor(inboundIdInt, "client_sub_links")
-				if err != nil {
-					t.sendCallbackAnswerTgBot(callbackQuery.ID, err.Error())
-					return
-				}
-				inbound, _ := t.inboundService.GetInbound(inboundIdInt)
-				t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.chooseClient", "Inbound=="+inbound.Remark), clientsKB)
 			case "get_clients_for_individual":
 				inboundId := dataArray[1]
 				inboundIdInt, err := strconv.Atoi(inboundId)
@@ -1482,7 +1467,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				client_ExpiryTime = 0
 				client_Enable = true
 				client_TgID = ""
-				client_SubID = t.randomLowerAndNum(16)
 				client_Comment = ""
 				client_Reset = 0
 				client_Security = "auto"
@@ -1522,13 +1506,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 
 				}
 				t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.allClients"))
-				t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.chooseInbound"), inbounds)
-			case "admin_client_sub_links":
-				inbounds, err := t.getInboundsFor("get_clients_for_sub")
-				if err != nil {
-					t.sendCallbackAnswerTgBot(callbackQuery.ID, err.Error())
-					return
-				}
 				t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.chooseInbound"), inbounds)
 			case "admin_client_individual_links":
 				inbounds, err := t.getInboundsFor("get_clients_for_individual")
@@ -1575,29 +1552,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 	case "client_commands":
 		t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.commands"))
 		t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.commands.helpClientCommands"))
-	case "client_sub_links":
-		// show user's own clients to choose one for sub links
-		tgUserID := callbackQuery.From.ID
-		traffics, err := t.inboundService.GetClientTrafficTgBot(tgUserID)
-		if err != nil {
-			// fallback to message
-			t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.errorOperation")+"\r\n"+err.Error())
-			return
-		}
-		if len(traffics) == 0 {
-			t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.askToAddUserId", "TgUserID=="+strconv.FormatInt(tgUserID, 10)))
-			return
-		}
-		var buttons []telego.InlineKeyboardButton
-		for _, tr := range traffics {
-			buttons = append(buttons, tu.InlineKeyboardButton(tr.Email).WithCallbackData(t.encodeQuery("client_sub_links "+tr.Email)))
-		}
-		cols := 1
-		if len(buttons) >= 6 {
-			cols = 2
-		}
-		keyboard := tu.InlineKeyboardGrid(tu.InlineKeyboardCols(cols, buttons...))
-		t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.commands.pleaseChoose"), keyboard)
 	case "client_individual_links":
 		// show user's clients to choose for individual links
 		tgUserID := callbackQuery.From.ID
@@ -1661,7 +1615,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 		client_ExpiryTime = 0
 		client_Enable = true
 		client_TgID = ""
-		client_SubID = t.randomLowerAndNum(16)
 		client_Comment = ""
 		client_Reset = 0
 		client_Security = "auto"
@@ -2012,11 +1965,10 @@ func (t *Tgbot) BuildJSONForProtocol(protocol model.Protocol) (string, error) {
                 "expiryTime": %d,
                 "enable": %t,
                 "tgId": "%s",
-                "subId": "%s",
                 "comment": "%s",
                 "reset": %d
             }]
-        }`, client_Id, client_Security, client_Email, client_LimitIP, client_TotalGB, client_ExpiryTime, client_Enable, client_TgID, client_SubID, client_Comment, client_Reset)
+        }`, client_Id, client_Security, client_Email, client_LimitIP, client_TotalGB, client_ExpiryTime, client_Enable, client_TgID, client_Comment, client_Reset)
 
 	case model.VLESS:
 		jsonString = fmt.Sprintf(`{
@@ -2029,11 +1981,10 @@ func (t *Tgbot) BuildJSONForProtocol(protocol model.Protocol) (string, error) {
                 "expiryTime": %d,
                 "enable": %t,
                 "tgId": "%s",
-                "subId": "%s",
                 "comment": "%s",
                 "reset": %d
             }]
-        }`, client_Id, client_Flow, client_Email, client_LimitIP, client_TotalGB, client_ExpiryTime, client_Enable, client_TgID, client_SubID, client_Comment, client_Reset)
+        }`, client_Id, client_Flow, client_Email, client_LimitIP, client_TotalGB, client_ExpiryTime, client_Enable, client_TgID, client_Comment, client_Reset)
 
 	case model.Trojan:
 		jsonString = fmt.Sprintf(`{
@@ -2045,11 +1996,10 @@ func (t *Tgbot) BuildJSONForProtocol(protocol model.Protocol) (string, error) {
                 "expiryTime": %d,
                 "enable": %t,
                 "tgId": "%s",
-                "subId": "%s",
                 "comment": "%s",
                 "reset": %d
             }]
-        }`, client_TrPassword, client_Email, client_LimitIP, client_TotalGB, client_ExpiryTime, client_Enable, client_TgID, client_SubID, client_Comment, client_Reset)
+        }`, client_TrPassword, client_Email, client_LimitIP, client_TotalGB, client_ExpiryTime, client_Enable, client_TgID, client_Comment, client_Reset)
 
 	case model.Shadowsocks:
 		jsonString = fmt.Sprintf(`{
@@ -2062,11 +2012,10 @@ func (t *Tgbot) BuildJSONForProtocol(protocol model.Protocol) (string, error) {
                 "expiryTime": %d,
                 "enable": %t,
                 "tgId": "%s",
-                "subId": "%s",
                 "comment": "%s",
                 "reset": %d
             }]
-        }`, client_Method, client_ShPassword, client_Email, client_LimitIP, client_TotalGB, client_ExpiryTime, client_Enable, client_TgID, client_SubID, client_Comment, client_Reset)
+        }`, client_Method, client_ShPassword, client_Email, client_LimitIP, client_TotalGB, client_ExpiryTime, client_Enable, client_TgID, client_Comment, client_Reset)
 
 	default:
 		return "", errors.New("unknown protocol")
@@ -2135,8 +2084,7 @@ func (t *Tgbot) SendAnswer(chatId int64, msg string, isAdmin bool) {
 			tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.addClient")).WithCallbackData(t.encodeQuery("add_client")),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton(t.I18nBot("pages.settings.subSettings")).WithCallbackData(t.encodeQuery("admin_client_sub_links")),
-			tu.InlineKeyboardButton(t.I18nBot("subscription.individualLinks")).WithCallbackData(t.encodeQuery("admin_client_individual_links")),
+			tu.InlineKeyboardButton(t.I18nBot("sharing.individualLinks")).WithCallbackData(t.encodeQuery("admin_client_individual_links")),
 			tu.InlineKeyboardButton(t.I18nBot("qrCode")).WithCallbackData(t.encodeQuery("admin_client_qr_links")),
 		),
 		// TODOOOOOOOOOOOOOO: Add restart button here.
@@ -2147,8 +2095,7 @@ func (t *Tgbot) SendAnswer(chatId int64, msg string, isAdmin bool) {
 			tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.commands")).WithCallbackData(t.encodeQuery("client_commands")),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton(t.I18nBot("pages.settings.subSettings")).WithCallbackData(t.encodeQuery("client_sub_links")),
-			tu.InlineKeyboardButton(t.I18nBot("subscription.individualLinks")).WithCallbackData(t.encodeQuery("client_individual_links")),
+			tu.InlineKeyboardButton(t.I18nBot("sharing.individualLinks")).WithCallbackData(t.encodeQuery("client_individual_links")),
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(t.I18nBot("qrCode")).WithCallbackData(t.encodeQuery("client_qr_links")),

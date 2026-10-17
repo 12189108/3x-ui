@@ -251,7 +251,7 @@ func updateSetting(port int, username string, password string, webBasePath strin
 	}
 
 	if webBasePath != "" {
-		err := settingService.SetBasePath("")
+		err := settingService.SetBasePath(webBasePath)
 		if err != nil {
 			fmt.Println("Failed to set base URI path:", err)
 		} else {
@@ -260,12 +260,11 @@ func updateSetting(port int, username string, password string, webBasePath strin
 	}
 
 	if resetTwoFactor {
-		err := settingService.SetTwoFactorEnable(false)
+		err := settingService.ResetTwoFactor()
 
 		if err != nil {
 			fmt.Println("Failed to reset two-factor authentication:", err)
 		} else {
-			settingService.SetTwoFactorToken("")
 			fmt.Println("Two-factor authentication reset successfully")
 		}
 	}
@@ -386,7 +385,7 @@ func main() {
 	var resetTwoFactor bool
 	settingCmd.BoolVar(&reset, "reset", false, "Reset all settings")
 	settingCmd.BoolVar(&show, "show", false, "Display current settings")
-	settingCmd.IntVar(&port, "port", 0, "Set panel port number")
+	settingCmd.IntVar(&port, "port", -1, "Set panel port number")
 	settingCmd.StringVar(&username, "username", "", "Set login username")
 	settingCmd.StringVar(&password, "password", "", "Set login password")
 	settingCmd.StringVar(&webBasePath, "webBasePath", "", "Set base path for Panel")

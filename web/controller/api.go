@@ -54,5 +54,8 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 
 // BackuptoTgbot sends a backup of the panel data to Telegram bot admins.
 func (a *APIController) BackuptoTgbot(c *gin.Context) {
+	if !a.checkSecondFactor(c) {
+		return
+	}
 	a.Tgbot.SendBackupToAdmins()
 }

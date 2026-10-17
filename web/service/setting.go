@@ -18,6 +18,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v2/util/reflect_util"
 	"github.com/mhsanaei/3x-ui/v2/web/entity"
 	"github.com/mhsanaei/3x-ui/v2/xray"
+	"gorm.io/gorm"
 )
 
 //go:embed config.json
@@ -50,25 +51,6 @@ var defaultValueMap = map[string]string{
 	"tgLang":                      "en-US",
 	"twoFactorEnable":             "false",
 	"twoFactorToken":              "",
-	"subEnable":                   "true",
-	"subJsonEnable":               "false",
-	"subTitle":                    "",
-	"subListen":                   "",
-	"subPort":                     "2096",
-	"subPath":                     "/sub/",
-	"subDomain":                   "",
-	"subCertFile":                 "",
-	"subKeyFile":                  "",
-	"subUpdates":                  "12",
-	"subEncrypt":                  "true",
-	"subShowInfo":                 "true",
-	"subURI":                      "",
-	"subJsonPath":                 "/json/",
-	"subJsonURI":                  "",
-	"subJsonFragment":             "",
-	"subJsonNoises":               "",
-	"subJsonMux":                  "",
-	"subJsonRules":                "",
 	"datepicker":                  "gregorian",
 	"warp":                        "",
 	"externalTrafficInformEnable": "false",
@@ -185,13 +167,14 @@ func (s *SettingService) GetAllSetting() (*entity.AllSetting, error) {
 }
 
 func (s *SettingService) ResetSettings() error {
-	db := database.GetDB()
-	err := db.Where("1 = 1").Delete(model.Setting{}).Error
-	if err != nil {
-		return err
-	}
-	return db.Model(model.User{}).
-		Where("1 = 1").Error
+	securitySettingsMu.Lock()
+	defer securitySettingsMu.Unlock()
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("1 = 1").Delete(&model.Setting{}).Error; err != nil {
+			return err
+		}
+		return revokeSessions(tx)
+	})
 }
 
 func (s *SettingService) getSetting(key string) (*model.Setting, error) {
@@ -347,7 +330,7 @@ func (s *SettingService) GetTwoFactorEnable() (bool, error) {
 }
 
 func (s *SettingService) SetTwoFactorEnable(value bool) error {
-	return s.setBool("twoFactorEnable", value)
+	return setSecuritySetting("twoFactorEnable", strconv.FormatBool(value))
 }
 
 func (s *SettingService) GetTwoFactorToken() (string, error) {
@@ -355,7 +338,7 @@ func (s *SettingService) GetTwoFactorToken() (string, error) {
 }
 
 func (s *SettingService) SetTwoFactorToken(value string) error {
-	return s.setString("twoFactorToken", value)
+	return setSecuritySetting("twoFactorToken", value)
 }
 
 func (s *SettingService) GetPort() (int, error) {
@@ -568,25 +551,47 @@ func (s *SettingService) GetLdapDefaultLimitIP() (int, error) {
 	return s.getInt("ldapDefaultLimitIP")
 }
 
-func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting) error {
+func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, twoFactorCode string) error {
 	if err := allSetting.CheckValid(); err != nil {
 		return err
 	}
 
-	v := reflect.ValueOf(allSetting).Elem()
-	t := reflect.TypeOf(allSetting).Elem()
-	fields := reflect_util.GetFields(t)
-	errs := make([]error, 0)
-	for _, field := range fields {
-		key := field.Tag.Get("json")
-		fieldV := v.FieldByName(field.Name)
-		value := fmt.Sprint(fieldV.Interface())
-		err := s.saveSetting(key, value)
-		if err != nil {
-			errs = append(errs, err)
+	securitySettingsMu.Lock()
+	defer securitySettingsMu.Unlock()
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		// Settings can redirect secret-bearing Telegram backups, so this also
+		// protects those destinations from bypassing the 2FA endpoint.
+		if err := requireTwoFactor(tx, twoFactorCode); err != nil {
+			return err
 		}
-	}
-	return common.Combine(errs...)
+		enabled, err := readSetting(tx, "twoFactorEnable")
+		if err != nil {
+			return err
+		}
+		isEnabled, err := strconv.ParseBool(enabled)
+		if err != nil {
+			return err
+		}
+		secret, err := readSetting(tx, "twoFactorToken")
+		if err != nil {
+			return err
+		}
+		if allSetting.TwoFactorEnable != isEnabled ||
+			(allSetting.TwoFactorToken != "" && allSetting.TwoFactorToken != secret) {
+			return errors.New("use the two-factor endpoint to change two-factor authentication")
+		}
+		v := reflect.ValueOf(allSetting).Elem()
+		for _, field := range reflect_util.GetFields(v.Type()) {
+			key := field.Tag.Get("json")
+			if key == "twoFactorEnable" || key == "twoFactorToken" {
+				continue
+			}
+			if err := writeSetting(tx, key, fmt.Sprint(v.FieldByName(field.Name).Interface())); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *SettingService) GetDefaultXrayConfig() (any, error) {

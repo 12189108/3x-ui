@@ -1,4 +1,4 @@
-// Package global provides global variables and interfaces for accessing web and subscription servers.
+// Package global provides global variables and interfaces for accessing the web server.
 package global
 
 import (

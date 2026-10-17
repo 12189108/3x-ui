@@ -8,7 +8,6 @@ import (
 	"github.com/mhsanaei/3x-ui/v2/logger"
 	"github.com/mhsanaei/3x-ui/v2/util/crypto"
 	ldaputil "github.com/mhsanaei/3x-ui/v2/util/ldap"
-	"github.com/xlzd/gotp"
 	"gorm.io/gorm"
 )
 
@@ -96,7 +95,7 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 			return nil
 		}
 
-		if gotp.NewDefaultTOTP(twoFactorToken).Now() != twoFactorCode {
+		if !VerifyTwoFactorCode(twoFactorToken, twoFactorCode) {
 			return nil
 		}
 	}
@@ -104,7 +103,7 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 	return user
 }
 
-func (s *UserService) UpdateUser(id int, username string, password string) error {
+func (s *UserService) UpdateUser(id int, username string, password string, twoFactorCode string) error {
 	db := database.GetDB()
 	hashedPassword, err := crypto.HashPasswordAsBcrypt(password)
 
@@ -112,20 +111,17 @@ func (s *UserService) UpdateUser(id int, username string, password string) error
 		return err
 	}
 
-	twoFactorEnable, err := s.settingService.GetTwoFactorEnable()
-	if err != nil {
-		return err
-	}
-
-	if twoFactorEnable {
-		s.settingService.SetTwoFactorEnable(false)
-		s.settingService.SetTwoFactorToken("")
-	}
-
-	return db.Model(model.User{}).
-		Where("id = ?", id).
-		Updates(map[string]any{"username": username, "password": hashedPassword}).
-		Error
+	securitySettingsMu.Lock()
+	defer securitySettingsMu.Unlock()
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := requireTwoFactor(tx, twoFactorCode); err != nil {
+			return err
+		}
+		return tx.Model(&model.User{}).Where("id = ?", id).Updates(map[string]any{
+			"username": username, "password": hashedPassword,
+			"login_epoch": gorm.Expr("login_epoch + 1"),
+		}).Error
+	})
 }
 
 func (s *UserService) UpdateFirstUser(username string, password string) error {
@@ -140,6 +136,8 @@ func (s *UserService) UpdateFirstUser(username string, password string) error {
 		return er
 	}
 
+	securitySettingsMu.Lock()
+	defer securitySettingsMu.Unlock()
 	db := database.GetDB()
 	user := &model.User{}
 	err := db.Model(model.User{}).First(user).Error
@@ -150,7 +148,8 @@ func (s *UserService) UpdateFirstUser(username string, password string) error {
 	} else if err != nil {
 		return err
 	}
-	user.Username = username
-	user.Password = hashedPassword
-	return db.Save(user).Error
+	return db.Model(user).Updates(map[string]any{
+		"username": username, "password": hashedPassword,
+		"login_epoch": gorm.Expr("login_epoch + 1"),
+	}).Error
 }

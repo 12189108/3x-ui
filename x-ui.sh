@@ -195,9 +195,9 @@ reset_user() {
 
     read -rp "Do you want to disable currently configured two-factor authentication? (y/n): " twoFactorConfirm
     if [[ $twoFactorConfirm != "y" && $twoFactorConfirm != "Y" ]]; then
-        /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password} -resetTwoFactor false >/dev/null 2>&1
+        /usr/local/x-ui/x-ui setting -username "${config_account}" -password "${config_password}" -resetTwoFactor=false >/dev/null 2>&1
     else
-        /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password} -resetTwoFactor true >/dev/null 2>&1
+        /usr/local/x-ui/x-ui setting -username "${config_account}" -password "${config_password}" -resetTwoFactor=true >/dev/null 2>&1
         echo -e "Two factor authentication has been disabled."
     fi
     
@@ -222,10 +222,16 @@ reset_webbasepath() {
         return
     fi
 
-    config_webBasePath=$(gen_random_string 18)
+    read -rp "Web base path (press Enter for /): " config_webBasePath
+    config_webBasePath=${config_webBasePath:-/}
+    [[ ${config_webBasePath} != /* ]] && config_webBasePath="/${config_webBasePath}"
+    [[ ${config_webBasePath} != */ ]] && config_webBasePath="${config_webBasePath}/"
 
     # Apply the new web base path setting
-    /usr/local/x-ui/x-ui setting -webBasePath "${config_webBasePath}" >/dev/null 2>&1
+    if ! /usr/local/x-ui/x-ui setting -webBasePath "${config_webBasePath}"; then
+        echo -e "${red}Failed to set web base path.${plain}"
+        return 1
+    fi
 
     echo -e "Web base path has been reset to: ${green}${config_webBasePath}${plain}"
     echo -e "${green}Please use the new web base path to access the panel.${plain}"
@@ -740,7 +746,6 @@ install_firewall() {
         ufw allow http
         ufw allow https
         ufw allow 2053/tcp #webPort
-        ufw allow 2096/tcp #subport
 
         # Enable the firewall
         ufw --force enable

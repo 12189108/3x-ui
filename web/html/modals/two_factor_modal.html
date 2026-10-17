@@ -42,8 +42,10 @@
         totpObject: null,
         qrImage: "",
         ok() {
-            if (twoFactorModal.totpObject.generate() === twoFactorModal.enteredCode) {
-                ObjectUtil.execute(twoFactorModal.confirm, true)
+            if (twoFactorModal.type === 'confirm' || twoFactorModal.totpObject.generate() === twoFactorModal.enteredCode) {
+                // Existing-factor confirmation happens on the server. Only a
+                // newly generated seed is available for a local setup preview.
+                ObjectUtil.execute(twoFactorModal.confirm, true, twoFactorModal.enteredCode)
 
                 twoFactorModal.close()
             } else {
@@ -65,22 +67,25 @@
             this.title = title;
             this.description = description;
             this.token = token;
+            this.enteredCode = '';
             this.visible = true;
             this.confirm = confirm;
             this.type = type;
 
-            this.totpObject = new OTPAuth.TOTP({
+            this.totpObject = type === 'set' ? new OTPAuth.TOTP({
                 issuer: "3x-ui",
                 label: "Administrator",
                 algorithm: "SHA1",
                 digits: 6,
                 period: 30,
                 secret: twoFactorModal.token,
-            });
+            }) : null;
         },
         close: function () {
             twoFactorModal.enteredCode = "";
             twoFactorModal.visible = false;
+            twoFactorModal.token = '';
+            twoFactorModal.totpObject = null;
         },
     };
 

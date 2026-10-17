@@ -1796,7 +1796,6 @@ Inbound.VmessSettings.VMESS = class extends XrayCommonClass {
         expiryTime = 0,
         enable = true,
         tgId = '',
-        subId = RandomUtil.randomLowerAndNum(16),
         comment = '',
         reset = 0,
         created_at = undefined,
@@ -1811,7 +1810,6 @@ Inbound.VmessSettings.VMESS = class extends XrayCommonClass {
         this.expiryTime = expiryTime;
         this.enable = enable;
         this.tgId = tgId;
-        this.subId = subId;
         this.comment = comment;
         this.reset = reset;
         this.created_at = created_at;
@@ -1828,7 +1826,6 @@ Inbound.VmessSettings.VMESS = class extends XrayCommonClass {
             json.expiryTime,
             json.enable,
             json.tgId,
-            json.subId,
             json.comment,
             json.reset,
             json.created_at,
@@ -1936,7 +1933,6 @@ Inbound.VLESSSettings.VLESS = class extends XrayCommonClass {
         expiryTime = 0,
         enable = true,
         tgId = '',
-        subId = RandomUtil.randomLowerAndNum(16),
         comment = '',
         reset = 0,
         created_at = undefined,
@@ -1951,7 +1947,6 @@ Inbound.VLESSSettings.VLESS = class extends XrayCommonClass {
         this.expiryTime = expiryTime;
         this.enable = enable;
         this.tgId = tgId;
-        this.subId = subId;
         this.comment = comment;
         this.reset = reset;
         this.created_at = created_at;
@@ -1968,7 +1963,6 @@ Inbound.VLESSSettings.VLESS = class extends XrayCommonClass {
             json.expiryTime,
             json.enable,
             json.tgId,
-            json.subId,
             json.comment,
             json.reset,
             json.created_at,
@@ -2081,7 +2075,6 @@ Inbound.TrojanSettings.Trojan = class extends XrayCommonClass {
         expiryTime = 0,
         enable = true,
         tgId = '',
-        subId = RandomUtil.randomLowerAndNum(16),
         comment = '',
         reset = 0,
         created_at = undefined,
@@ -2095,7 +2088,6 @@ Inbound.TrojanSettings.Trojan = class extends XrayCommonClass {
         this.expiryTime = expiryTime;
         this.enable = enable;
         this.tgId = tgId;
-        this.subId = subId;
         this.comment = comment;
         this.reset = reset;
         this.created_at = created_at;
@@ -2111,7 +2103,6 @@ Inbound.TrojanSettings.Trojan = class extends XrayCommonClass {
             expiryTime: this.expiryTime,
             enable: this.enable,
             tgId: this.tgId,
-            subId: this.subId,
             comment: this.comment,
             reset: this.reset,
             created_at: this.created_at,
@@ -2128,7 +2119,6 @@ Inbound.TrojanSettings.Trojan = class extends XrayCommonClass {
             json.expiryTime,
             json.enable,
             json.tgId,
-            json.subId,
             json.comment,
             json.reset,
             json.created_at,
@@ -2250,7 +2240,6 @@ Inbound.ShadowsocksSettings.Shadowsocks = class extends XrayCommonClass {
         expiryTime = 0,
         enable = true,
         tgId = '',
-        subId = RandomUtil.randomLowerAndNum(16),
         comment = '',
         reset = 0,
         created_at = undefined,
@@ -2265,7 +2254,6 @@ Inbound.ShadowsocksSettings.Shadowsocks = class extends XrayCommonClass {
         this.expiryTime = expiryTime;
         this.enable = enable;
         this.tgId = tgId;
-        this.subId = subId;
         this.comment = comment;
         this.reset = reset;
         this.created_at = created_at;
@@ -2282,7 +2270,6 @@ Inbound.ShadowsocksSettings.Shadowsocks = class extends XrayCommonClass {
             expiryTime: this.expiryTime,
             enable: this.enable,
             tgId: this.tgId,
-            subId: this.subId,
             comment: this.comment,
             reset: this.reset,
             created_at: this.created_at,
@@ -2300,7 +2287,6 @@ Inbound.ShadowsocksSettings.Shadowsocks = class extends XrayCommonClass {
             json.expiryTime,
             json.enable,
             json.tgId,
-            json.subId,
             json.comment,
             json.reset,
             json.created_at,

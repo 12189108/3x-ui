@@ -7,6 +7,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v2/logger"
 	"github.com/mhsanaei/3x-ui/v2/web/locale"
+	"github.com/mhsanaei/3x-ui/v2/web/service"
 	"github.com/mhsanaei/3x-ui/v2/web/session"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,17 @@ import (
 
 // BaseController provides common functionality for all controllers, including authentication checks.
 type BaseController struct{}
+
+// Keep codes out of download URLs and access logs. Both backup export and
+// restore need this gate because backups contain the second-factor seed.
+func (a *BaseController) checkSecondFactor(c *gin.Context) bool {
+	settings := service.SettingService{}
+	if err := settings.CheckTwoFactorCode(c.GetHeader("X-Two-Factor-Code")); err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.settings.security.twoFactorModalError"), err)
+		return false
+	}
+	return true
+}
 
 // checkLogin is a middleware that verifies user authentication and handles unauthorized access.
 func (a *BaseController) checkLogin(c *gin.Context) {

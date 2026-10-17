@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v2/util/crypto"
@@ -9,15 +10,17 @@ import (
 	"github.com/mhsanaei/3x-ui/v2/web/service"
 	"github.com/mhsanaei/3x-ui/v2/web/session"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
 // updateUserForm represents the form for updating user credentials.
 type updateUserForm struct {
-	OldUsername string `json:"oldUsername" form:"oldUsername"`
-	OldPassword string `json:"oldPassword" form:"oldPassword"`
-	NewUsername string `json:"newUsername" form:"newUsername"`
-	NewPassword string `json:"newPassword" form:"newPassword"`
+	OldUsername   string `json:"oldUsername" form:"oldUsername"`
+	OldPassword   string `json:"oldPassword" form:"oldPassword"`
+	NewUsername   string `json:"newUsername" form:"newUsername"`
+	NewPassword   string `json:"newPassword" form:"newPassword"`
+	TwoFactorCode string `json:"twoFactorCode" form:"twoFactorCode"`
 }
 
 // SettingController handles settings and user management operations.
@@ -42,6 +45,7 @@ func (a *SettingController) initRouter(g *gin.RouterGroup) {
 	g.POST("/defaultSettings", a.getDefaultSettings)
 	g.POST("/update", a.updateSetting)
 	g.POST("/updateUser", a.updateUser)
+	g.POST("/twoFactor", a.updateTwoFactor)
 	g.POST("/restartPanel", a.restartPanel)
 	g.GET("/getDefaultJsonConfig", a.getDefaultXrayConfig)
 }
@@ -53,6 +57,8 @@ func (a *SettingController) getAllSetting(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.getSettings"), err)
 		return
 	}
+	// The existing seed must never be sent back to a browser session.
+	allSetting.TwoFactorToken = ""
 	jsonObj(c, allSetting, nil)
 }
 
@@ -68,13 +74,16 @@ func (a *SettingController) getDefaultSettings(c *gin.Context) {
 
 // updateSetting updates all settings with the provided data.
 func (a *SettingController) updateSetting(c *gin.Context) {
-	allSetting := &entity.AllSetting{}
-	err := c.ShouldBind(allSetting)
+	var form struct {
+		entity.AllSetting
+		TwoFactorCode string `json:"twoFactorCode" form:"twoFactorCode"`
+	}
+	err := c.ShouldBind(&form)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
 		return
 	}
-	err = a.settingService.UpdateAllSetting(allSetting)
+	err = a.settingService.UpdateAllSetting(&form.AllSetting, form.TwoFactorCode)
 	jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
 }
 
@@ -87,6 +96,10 @@ func (a *SettingController) updateUser(c *gin.Context) {
 		return
 	}
 	user := session.GetLoginUser(c)
+	if user == nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
 	if user.Username != form.OldUsername || !crypto.CheckPasswordHash(user.Password, form.OldPassword) {
 		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifyUserError"), errors.New(I18nWeb(c, "pages.settings.toasts.originalUserPassIncorrect")))
 		return
@@ -95,13 +108,31 @@ func (a *SettingController) updateUser(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifyUserError"), errors.New(I18nWeb(c, "pages.settings.toasts.userPassMustBeNotEmpty")))
 		return
 	}
-	err = a.userService.UpdateUser(user.Id, form.NewUsername, form.NewPassword)
+	err = a.userService.UpdateUser(user.Id, form.NewUsername, form.NewPassword, form.TwoFactorCode)
 	if err == nil {
-		user.Username = form.NewUsername
-		user.Password, _ = crypto.HashPasswordAsBcrypt(form.NewPassword)
-		session.SetLoginUser(c, user)
+		session.ClearSession(c)
+		err = sessions.Default(c).Save()
 	}
 	jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifyUser"), err)
+}
+
+func (a *SettingController) updateTwoFactor(c *gin.Context) {
+	var form struct {
+		Enabled          bool   `json:"enabled" form:"enabled"`
+		Secret           string `json:"secret" form:"secret"`
+		TwoFactorCode    string `json:"twoFactorCode" form:"twoFactorCode"`
+		NewTwoFactorCode string `json:"newTwoFactorCode" form:"newTwoFactorCode"`
+	}
+	if err := c.ShouldBind(&form); err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
+		return
+	}
+	err := a.settingService.UpdateTwoFactor(form.Enabled, form.Secret, form.TwoFactorCode, form.NewTwoFactorCode)
+	if err == nil {
+		session.ClearSession(c)
+		err = sessions.Default(c).Save()
+	}
+	jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
 }
 
 // restartPanel restarts the panel service after a delay.

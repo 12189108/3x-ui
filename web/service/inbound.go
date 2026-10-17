@@ -35,7 +35,7 @@ func (s *InboundService) GetInbounds(userId int) ([]*model.Inbound, error) {
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
 	}
-	// Enrich client stats with UUID/SubId from inbound settings
+	// Enrich client stats with UUID from inbound settings
 	for _, inbound := range inbounds {
 		clients, _ := s.GetClients(inbound)
 		if len(clients) == 0 || len(inbound.ClientStats) == 0 {
@@ -65,7 +65,7 @@ func (s *InboundService) GetAllInbounds() ([]*model.Inbound, error) {
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
 	}
-	// Enrich client stats with UUID/SubId from inbound settings
+	// Enrich client stats with UUID from inbound settings
 	for _, inbound := range inbounds {
 		clients, _ := s.GetClients(inbound)
 		if len(clients) == 0 || len(inbound.ClientStats) == 0 {

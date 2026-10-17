@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"net/http"
 
+	"github.com/mhsanaei/3x-ui/v2/database"
 	"github.com/mhsanaei/3x-ui/v2/database/model"
 
 	"github.com/gin-contrib/sessions"
@@ -13,22 +14,24 @@ import (
 )
 
 const (
-	loginUserKey = "LOGIN_USER"
-	defaultPath  = "/"
+	loginUserKey  = "LOGIN_USER"
+	loginEpochKey = "LOGIN_EPOCH"
+	defaultPath   = "/"
 )
 
 func init() {
 	gob.Register(model.User{})
 }
 
-// SetLoginUser stores the authenticated user in the session.
-// The user object is serialized and stored for subsequent requests.
+// SetLoginUser stores only the user ID and revocation version in the cookie.
 func SetLoginUser(c *gin.Context, user *model.User) {
 	if user == nil {
 		return
 	}
 	s := sessions.Default(c)
-	s.Set(loginUserKey, *user)
+	s.Clear()
+	s.Set(loginUserKey, user.Id)
+	s.Set(loginEpochKey, user.LoginEpoch)
 }
 
 // SetMaxAge configures the session cookie maximum age in seconds.
@@ -51,13 +54,23 @@ func GetLoginUser(c *gin.Context) *model.User {
 	if obj == nil {
 		return nil
 	}
-	user, ok := obj.(model.User)
-	if !ok {
-
-		s.Delete(loginUserKey)
+	id, ok := obj.(int)
+	epoch, hasEpoch := s.Get(loginEpochKey).(int64)
+	// Legacy cookies contain a full User, including a password hash. Reject them.
+	if !ok || !hasEpoch || id <= 0 {
+		s.Clear()
 		return nil
 	}
-	return &user
+	db := database.GetDB()
+	if db == nil {
+		return nil
+	}
+	user := &model.User{}
+	if err := db.First(user, id).Error; err != nil || user.LoginEpoch != epoch {
+		s.Clear()
+		return nil
+	}
+	return user
 }
 
 // IsLogin checks if a user is currently authenticated in the session.
