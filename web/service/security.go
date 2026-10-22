@@ -20,6 +20,8 @@ import (
 // Serialize credential and second-factor changes, including their validation.
 var securitySettingsMu sync.Mutex
 
+var ErrInvalidTwoFactorCode = errors.New("invalid two-factor code")
+
 func readSetting(tx *gorm.DB, key string) (string, error) {
 	var setting model.Setting
 	err := tx.Where("key = ?", key).First(&setting).Error
@@ -98,7 +100,7 @@ func requireTwoFactor(tx *gorm.DB, code string) error {
 		return err
 	}
 	if !VerifyTwoFactorCode(secret, code) {
-		return errors.New("invalid two-factor code")
+		return ErrInvalidTwoFactorCode
 	}
 	return nil
 }

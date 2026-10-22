@@ -3,30 +3,23 @@ package controller
 import (
 	"net"
 	"net/http"
-	"net/netip"
-	"strings"
 
 	"github.com/mhsanaei/3x-ui/v2/config"
 	"github.com/mhsanaei/3x-ui/v2/logger"
 	"github.com/mhsanaei/3x-ui/v2/web/entity"
+	"github.com/mhsanaei/3x-ui/v2/web/network"
 
 	"github.com/gin-gonic/gin"
 )
 
 // getRemoteIp extracts the real IP address from the request headers or remote address.
 func getRemoteIp(c *gin.Context) string {
-	if ip, err := netip.ParseAddr(strings.TrimSpace(c.GetHeader("X-Real-IP"))); err == nil {
-		return ip.WithZone("").Unmap().String()
+	if ip := c.GetString("client_ip"); ip != "" {
+		return ip
 	}
-	for _, value := range strings.Split(c.GetHeader("X-Forwarded-For"), ",") {
-		if ip, err := netip.ParseAddr(strings.TrimSpace(value)); err == nil {
-			return ip.WithZone("").Unmap().String()
-		}
-	}
-	addr := c.Request.RemoteAddr
-	ip, _, _ := net.SplitHostPort(addr)
-	if parsed, err := netip.ParseAddr(ip); err == nil {
-		return parsed.WithZone("").Unmap().String()
+	resolver, _ := network.NewClientIPResolver("")
+	if ip, err := resolver.Resolve(c.Request); err == nil {
+		return ip.String()
 	}
 	return "unknown"
 }

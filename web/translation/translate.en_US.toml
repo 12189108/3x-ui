@@ -90,6 +90,10 @@
 "loginAgain" = "Your session has expired, please log in again"
 
 [pages.login.toasts]
+"ipBanned" = "This IP is permanently blocked after 3 failed logins. Contact the administrator."
+"rateLimited" = "Too many login requests. Wait at least 2 seconds before retrying."
+"protectionUnavailable" = "Login protection is temporarily unavailable. Please try again later."
+"ipUnavailable" = "Unable to determine your connection IP. Check the reverse proxy configuration."
 "invalidFormData" = "The Input data format is invalid."
 "emptyUsername" = "Username is required"
 "emptyPassword" = "Password is required"

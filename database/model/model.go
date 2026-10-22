@@ -33,6 +33,16 @@ type User struct {
 	LoginSecret      string `json:"-" gorm:"default:''"`
 }
 
+// LoginGuard persists cumulative failures and permanent bans across restarts.
+type LoginGuard struct {
+	IP            string `gorm:"primaryKey;size:45" json:"ip"`
+	Failures      int    `gorm:"not null;default:0" json:"failures"`
+	Banned        bool   `gorm:"not null;default:false" json:"banned"`
+	NextAttemptAt int64  `gorm:"not null;default:0" json:"-"`
+	LeaseUntil    int64  `gorm:"not null;default:0" json:"-"`
+	AttemptToken  string `gorm:"not null;default:''" json:"-"`
+}
+
 // Inbound represents an Xray inbound configuration with traffic statistics and settings.
 type Inbound struct {
 	Id                   int                  `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`                                                    // Unique identifier

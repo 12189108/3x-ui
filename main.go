@@ -383,6 +383,8 @@ func main() {
 	var getCert bool
 	var resetTwoFactor bool
 	var resetLoginSecret bool
+	var unbanIP string
+	var listBannedIPs bool
 	settingCmd.BoolVar(&reset, "reset", false, "Reset all settings")
 	settingCmd.BoolVar(&show, "show", false, "Display current settings")
 	settingCmd.IntVar(&port, "port", -1, "Set panel port number")
@@ -392,6 +394,8 @@ func main() {
 	settingCmd.StringVar(&listenIP, "listenIP", "", "set panel listenIP IP")
 	settingCmd.BoolVar(&resetTwoFactor, "resetTwoFactor", false, "Reset two-factor authentication settings")
 	settingCmd.BoolVar(&resetLoginSecret, "resetLoginSecret", false, "Reset legacy static login keys")
+	settingCmd.StringVar(&unbanIP, "unbanIP", "", "Clear a login IP ban and its failure count")
+	settingCmd.BoolVar(&listBannedIPs, "listBannedIPs", false, "List permanently banned login IPs")
 	settingCmd.BoolVar(&getListen, "getListen", false, "Display current panel listenIP IP")
 	settingCmd.BoolVar(&getCert, "getCert", false, "Display current certificate settings")
 	settingCmd.StringVar(&webCertFile, "webCert", "", "Set path to public key file for panel")
@@ -444,6 +448,22 @@ func main() {
 				log.Fatal("Failed to reset legacy login keys: ", err)
 			}
 			fmt.Println("Legacy login keys reset successfully")
+		}
+		if unbanIP != "" {
+			if err := service.UnbanLoginIP(unbanIP); err != nil {
+				log.Fatal("Failed to unban IP: ", err)
+			}
+			fmt.Println("Login IP ban and failure count cleared:", unbanIP)
+		}
+		if listBannedIPs {
+			banned, err := service.ListBannedLoginIPs()
+			if err != nil {
+				log.Fatal("Failed to list banned IPs: ", err)
+			}
+			fmt.Println("IP\tFailures")
+			for _, guard := range banned {
+				fmt.Printf("%s\t%d\n", guard.IP, guard.Failures)
+			}
 		}
 		if show {
 			showSetting(show)

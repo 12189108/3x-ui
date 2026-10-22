@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"text/template"
 	"time"
@@ -58,29 +59,71 @@ func (a *IndexController) index(c *gin.Context) {
 
 // login handles user authentication and session creation.
 func (a *IndexController) login(c *gin.Context) {
+	ip := getRemoteIp(c)
+	attempt, err := service.BeginLoginAttempt(ip)
+	if err != nil {
+		a.loginProtectionError(c, err)
+		return
+	}
+	defer attempt.Complete(false)
+	fail := func(message string) {
+		banned, err := attempt.Complete(true)
+		if err != nil {
+			a.loginProtectionError(c, err)
+			return
+		}
+		if banned {
+			logger.Warningf("permanently blocked login IP after 3 failures: %s", ip)
+			a.loginProtectionError(c, service.ErrLoginBanned)
+			return
+		}
+		pureJsonMsg(c, http.StatusOK, false, message)
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16*1024)
 	var form LoginForm
 
 	if err := c.ShouldBind(&form); err != nil {
-		pureJsonMsg(c, http.StatusOK, false, I18nWeb(c, "pages.login.toasts.invalidFormData"))
+		fail(I18nWeb(c, "pages.login.toasts.invalidFormData"))
 		return
 	}
 	if form.Username == "" {
-		pureJsonMsg(c, http.StatusOK, false, I18nWeb(c, "pages.login.toasts.emptyUsername"))
+		fail(I18nWeb(c, "pages.login.toasts.emptyUsername"))
 		return
 	}
 	if form.Password == "" {
-		pureJsonMsg(c, http.StatusOK, false, I18nWeb(c, "pages.login.toasts.emptyPassword"))
+		fail(I18nWeb(c, "pages.login.toasts.emptyPassword"))
 		return
 	}
 
-	user := a.userService.CheckUser(form.Username, form.Password, form.TwoFactorCode, form.LoginSecret)
+	if err := attempt.Validate(); err != nil {
+		a.loginProtectionError(c, err)
+		return
+	}
+	releaseWorker, err := service.AcquireLoginWorker()
+	if err != nil {
+		a.loginProtectionError(c, err)
+		return
+	}
+	defer releaseWorker()
+	user, authErr := a.userService.AuthenticateUser(form.Username, form.Password, form.TwoFactorCode, form.LoginSecret)
+	if authErr != nil && !errors.Is(authErr, service.ErrInvalidCredentials) {
+		a.loginProtectionError(c, authErr)
+		return
+	}
 	timeStr := time.Now().Format("2006-01-02 15:04:05")
 	safeUser := template.HTMLEscapeString(form.Username)
 
 	if user == nil {
-		logger.Warningf("login failed for username: \"%s\", IP: \"%s\"", safeUser, getRemoteIp(c))
-		a.tgbot.UserLoginNotify(safeUser, "[redacted]", getRemoteIp(c), timeStr, 0)
-		pureJsonMsg(c, http.StatusOK, false, I18nWeb(c, "pages.login.toasts.wrongUsernameOrPassword"))
+		logger.Warningf("login failed for username: \"%s\", IP: \"%s\"", safeUser, ip)
+		fail(I18nWeb(c, "pages.login.toasts.wrongUsernameOrPassword"))
+		a.tgbot.UserLoginNotify(safeUser, "[redacted]", ip, timeStr, 0)
+		return
+	}
+	if banned, err := attempt.Complete(false); err != nil || banned {
+		if banned {
+			err = service.ErrLoginBanned
+		}
+		a.loginProtectionError(c, err)
 		return
 	}
 
@@ -101,6 +144,20 @@ func (a *IndexController) login(c *gin.Context) {
 
 	logger.Infof("%s logged in successfully", safeUser)
 	jsonMsg(c, I18nWeb(c, "pages.login.toasts.successLogin"), nil)
+}
+
+func (a *IndexController) loginProtectionError(c *gin.Context, err error) {
+	status, key := http.StatusServiceUnavailable, "protectionUnavailable"
+	switch {
+	case errors.Is(err, service.ErrLoginBanned):
+		status, key = http.StatusForbidden, "ipBanned"
+	case errors.Is(err, service.ErrLoginRateLimited):
+		status, key = http.StatusTooManyRequests, "rateLimited"
+		c.Header("Retry-After", "2")
+	default:
+		logger.Warning("login protection unavailable:", err)
+	}
+	pureJsonMsg(c, status, false, I18nWeb(c, "pages.login.toasts."+key))
 }
 
 // logout handles user logout by clearing the session and redirecting to the login page.

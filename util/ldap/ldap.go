@@ -3,6 +3,9 @@ package ldaputil
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"strconv"
+	"time"
 
 	"github.com/go-ldap/ldap/v3"
 )
@@ -90,18 +93,18 @@ func FetchVlessFlags(cfg Config) (map[string]bool, error) {
 
 // AuthenticateUser searches user by cfg.UserAttr and attempts to bind with provided password.
 func AuthenticateUser(cfg Config, username, password string) (bool, error) {
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
-	var conn *ldap.Conn
-	var err error
+	scheme := "ldap"
 	if cfg.UseTLS {
-		conn, err = ldap.DialTLS("tcp", addr, &tls.Config{InsecureSkipVerify: false})
-	} else {
-		conn, err = ldap.Dial("tcp", addr)
+		scheme = "ldaps"
 	}
+	conn, err := ldap.DialURL(scheme+"://"+net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		ldap.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}),
+		ldap.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: false}))
 	if err != nil {
 		return false, err
 	}
 	defer conn.Close()
+	conn.SetTimeout(10 * time.Second)
 
 	// Optional initial bind for search
 	if cfg.BindDN != "" {
@@ -136,7 +139,10 @@ func AuthenticateUser(cfg Config, username, password string) (bool, error) {
 	userDN := res.Entries[0].DN
 	// Try to bind as the user
 	if err := conn.Bind(userDN, password); err != nil {
-		return false, nil
+		if ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) {
+			return false, nil
+		}
+		return false, err
 	}
 	return true, nil
 }

@@ -90,6 +90,10 @@
 "loginAgain" = "登录时效已过，请重新登录"
 
 [pages.login.toasts]
+"ipBanned" = "此 IP 累计登录失败 3 次，已被永久封禁，请联系管理员解封。"
+"rateLimited" = "登录请求过于频繁，请至少等待 2 秒后重试。"
+"protectionUnavailable" = "登录防护暂时不可用，请稍后重试。"
+"ipUnavailable" = "无法确定连接 IP，请检查反向代理配置。"
 "invalidFormData" = "数据格式错误"
 "emptyUsername" = "请输入用户名"
 "emptyPassword" = "请输入密码"

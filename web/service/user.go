@@ -48,6 +48,15 @@ func (s *UserService) HasLoginSecret() (bool, error) {
 }
 
 func (s *UserService) CheckUser(username string, password string, twoFactorCode string, loginSecret ...string) *model.User {
+	user, _ := s.AuthenticateUser(username, password, twoFactorCode, loginSecret...)
+	return user
+}
+
+var ErrInvalidCredentials = errors.New("invalid credentials")
+
+// Authentication failures are distinct from internal errors: outages must not
+// consume the three failures that permanently ban an IP.
+func (s *UserService) AuthenticateUser(username string, password string, twoFactorCode string, loginSecret ...string) (*model.User, error) {
 	db := database.GetDB()
 
 	user := &model.User{}
@@ -60,30 +69,50 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 		err = db.Where("credential_scheme = ? AND LOWER(username) = ?", crypto.CredentialSHA384, crypto.SHA384Hash(username)).First(user).Error
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
+		return nil, ErrInvalidCredentials
 	} else if err != nil {
 		logger.Warning("check user err:", err)
-		return nil
+		return nil, err
 	}
 
 	// If LDAP enabled and local password check fails, attempt LDAP auth
 	if !MatchLocalCredentials(user, username, password) {
 		if user.CredentialScheme == crypto.CredentialSHA384 {
-			return nil
+			return nil, ErrInvalidCredentials
 		}
-		ldapEnabled, _ := s.settingService.GetLdapEnable()
+		ldapEnabled, err := s.settingService.GetLdapEnable()
+		if err != nil {
+			return nil, err
+		}
 		if !ldapEnabled {
-			return nil
+			return nil, ErrInvalidCredentials
 		}
 
-		host, _ := s.settingService.GetLdapHost()
-		port, _ := s.settingService.GetLdapPort()
-		useTLS, _ := s.settingService.GetLdapUseTLS()
-		bindDN, _ := s.settingService.GetLdapBindDN()
-		ldapPass, _ := s.settingService.GetLdapPassword()
-		baseDN, _ := s.settingService.GetLdapBaseDN()
-		userFilter, _ := s.settingService.GetLdapUserFilter()
-		userAttr, _ := s.settingService.GetLdapUserAttr()
+		readString := func(get func() (string, error)) string {
+			if err != nil {
+				return ""
+			}
+			var value string
+			value, err = get()
+			return value
+		}
+		host := readString(s.settingService.GetLdapHost)
+		port, portErr := s.settingService.GetLdapPort()
+		if portErr != nil {
+			return nil, portErr
+		}
+		useTLS, tlsErr := s.settingService.GetLdapUseTLS()
+		if tlsErr != nil {
+			return nil, tlsErr
+		}
+		bindDN := readString(s.settingService.GetLdapBindDN)
+		ldapPass := readString(s.settingService.GetLdapPassword)
+		baseDN := readString(s.settingService.GetLdapBaseDN)
+		userFilter := readString(s.settingService.GetLdapUserFilter)
+		userAttr := readString(s.settingService.GetLdapUserAttr)
+		if err != nil {
+			return nil, err
+		}
 
 		cfg := ldaputil.Config{
 			Host:       host,
@@ -96,8 +125,11 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 			UserAttr:   userAttr,
 		}
 		ok, err := ldaputil.AuthenticateUser(cfg, username, password)
-		if err != nil || !ok {
-			return nil
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, ErrInvalidCredentials
 		}
 		// On successful LDAP auth, continue 2FA checks below
 	}
@@ -107,7 +139,7 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 		providedSecret = loginSecret[0]
 	}
 	if user.LoginSecret != "" && subtle.ConstantTimeCompare([]byte(user.LoginSecret), []byte(providedSecret)) != 1 {
-		return nil
+		return nil, ErrInvalidCredentials
 	}
 
 	securitySettingsMu.Lock()
@@ -150,10 +182,13 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, ErrInvalidTwoFactorCode) {
+			return nil, ErrInvalidCredentials
+		}
 		logger.Warning("login validation or credential migration failed:", err)
-		return nil
+		return nil, err
 	}
-	return user
+	return user, nil
 }
 
 func (s *UserService) UpdateUser(id int, username string, password string, twoFactorCode string) error {

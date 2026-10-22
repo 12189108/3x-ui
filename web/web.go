@@ -237,6 +237,11 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	}
 	engine.SetFuncMap(funcMap)
 	engine.Use(locale.LocalizerMiddleware())
+	ipResolver, err := network.NewClientIPResolver(os.Getenv("XUI_TRUSTED_PROXIES"))
+	if err != nil {
+		return nil, err
+	}
+	engine.Use(middleware.LoginIPGuard(ipResolver))
 
 	// set static files and template
 	if config.IsDebug() {
@@ -466,7 +471,9 @@ func (s *Server) Start() (err error) {
 	s.listener = listener
 
 	s.httpServer = &http.Server{
-		Handler: engine,
+		Handler:           engine,
+		ConnContext:       network.ClientIPConnContext,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
