@@ -18,6 +18,7 @@ type LoginForm struct {
 	Username      string `json:"username" form:"username"`
 	Password      string `json:"password" form:"password"`
 	TwoFactorCode string `json:"twoFactorCode" form:"twoFactorCode"`
+	LoginSecret   string `json:"loginSecret" form:"loginSecret"`
 }
 
 // IndexController handles the main index and login-related routes.
@@ -43,6 +44,7 @@ func (a *IndexController) initRouter(g *gin.RouterGroup) {
 
 	g.POST("/login", a.login)
 	g.POST("/getTwoFactorEnable", a.getTwoFactorEnable)
+	g.POST("/getLoginSecretEnable", a.getLoginSecretEnable)
 }
 
 // index handles the root route, redirecting logged-in users to the panel or showing the login page.
@@ -71,14 +73,13 @@ func (a *IndexController) login(c *gin.Context) {
 		return
 	}
 
-	user := a.userService.CheckUser(form.Username, form.Password, form.TwoFactorCode)
+	user := a.userService.CheckUser(form.Username, form.Password, form.TwoFactorCode, form.LoginSecret)
 	timeStr := time.Now().Format("2006-01-02 15:04:05")
 	safeUser := template.HTMLEscapeString(form.Username)
-	safePass := template.HTMLEscapeString(form.Password)
 
 	if user == nil {
-		logger.Warningf("wrong username: \"%s\", password: \"%s\", IP: \"%s\"", safeUser, safePass, getRemoteIp(c))
-		a.tgbot.UserLoginNotify(safeUser, safePass, getRemoteIp(c), timeStr, 0)
+		logger.Warningf("login failed for username: \"%s\", IP: \"%s\"", safeUser, getRemoteIp(c))
+		a.tgbot.UserLoginNotify(safeUser, "[redacted]", getRemoteIp(c), timeStr, 0)
 		pureJsonMsg(c, http.StatusOK, false, I18nWeb(c, "pages.login.toasts.wrongUsernameOrPassword"))
 		return
 	}
@@ -121,4 +122,9 @@ func (a *IndexController) getTwoFactorEnable(c *gin.Context) {
 	if err == nil {
 		jsonObj(c, status, nil)
 	}
+}
+
+func (a *IndexController) getLoginSecretEnable(c *gin.Context) {
+	enabled, err := a.userService.HasLoginSecret()
+	jsonObj(c, enabled, err)
 }

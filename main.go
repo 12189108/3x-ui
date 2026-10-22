@@ -14,7 +14,6 @@ import (
 	"github.com/mhsanaei/3x-ui/v2/config"
 	"github.com/mhsanaei/3x-ui/v2/database"
 	"github.com/mhsanaei/3x-ui/v2/logger"
-	"github.com/mhsanaei/3x-ui/v2/util/crypto"
 	"github.com/mhsanaei/3x-ui/v2/web"
 	"github.com/mhsanaei/3x-ui/v2/web/global"
 	"github.com/mhsanaei/3x-ui/v2/web/service"
@@ -154,7 +153,7 @@ func showSetting(show bool) {
 		}
 
 		hasDefaultCredential := func() bool {
-			return userModel.Username == "admin" && crypto.CheckPasswordHash(userModel.Password, "admin")
+			return service.MatchLocalCredentials(userModel, "admin", "admin")
 		}()
 
 		fmt.Println("hasDefaultCredential:", hasDefaultCredential)
@@ -383,6 +382,7 @@ func main() {
 	var show bool
 	var getCert bool
 	var resetTwoFactor bool
+	var resetLoginSecret bool
 	settingCmd.BoolVar(&reset, "reset", false, "Reset all settings")
 	settingCmd.BoolVar(&show, "show", false, "Display current settings")
 	settingCmd.IntVar(&port, "port", -1, "Set panel port number")
@@ -391,6 +391,7 @@ func main() {
 	settingCmd.StringVar(&webBasePath, "webBasePath", "", "Set base path for Panel")
 	settingCmd.StringVar(&listenIP, "listenIP", "", "set panel listenIP IP")
 	settingCmd.BoolVar(&resetTwoFactor, "resetTwoFactor", false, "Reset two-factor authentication settings")
+	settingCmd.BoolVar(&resetLoginSecret, "resetLoginSecret", false, "Reset legacy static login keys")
 	settingCmd.BoolVar(&getListen, "getListen", false, "Display current panel listenIP IP")
 	settingCmd.BoolVar(&getCert, "getCert", false, "Display current certificate settings")
 	settingCmd.StringVar(&webCertFile, "webCert", "", "Set path to public key file for panel")
@@ -436,6 +437,13 @@ func main() {
 			resetSetting()
 		} else {
 			updateSetting(port, username, password, webBasePath, listenIP, resetTwoFactor)
+		}
+		if resetLoginSecret {
+			settings := service.SettingService{}
+			if err := settings.ResetLoginSecrets(); err != nil {
+				log.Fatal("Failed to reset legacy login keys: ", err)
+			}
+			fmt.Println("Legacy login keys reset successfully")
 		}
 		if show {
 			showSetting(show)

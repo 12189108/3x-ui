@@ -166,3 +166,15 @@ func (s *SettingService) ResetTwoFactor() error {
 		return revokeSessions(tx)
 	})
 }
+
+// Local recovery for the optional static login key used by the SHA-384 fork.
+func (s *SettingService) ResetLoginSecrets() error {
+	securitySettingsMu.Lock()
+	defer securitySettingsMu.Unlock()
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.User{}).Where("1 = 1").Update("login_secret", "").Error; err != nil {
+			return err
+		}
+		return revokeSessions(tx)
+	})
+}

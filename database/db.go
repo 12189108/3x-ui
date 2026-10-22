@@ -5,12 +5,12 @@ package database
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"log"
 	"os"
 	"path"
-	"slices"
 
 	"github.com/mhsanaei/3x-ui/v2/config"
 	"github.com/mhsanaei/3x-ui/v2/database/model"
@@ -64,52 +64,62 @@ func initUser() error {
 		}
 
 		user := &model.User{
-			Username: defaultUsername,
-			Password: hashedPassword,
+			Username:         defaultUsername,
+			Password:         hashedPassword,
+			CredentialScheme: crypto.CredentialBcrypt,
 		}
 		return db.Create(user).Error
 	}
 	return nil
 }
 
-// runSeeders migrates user passwords to bcrypt and records seeder execution to prevent re-running.
-func runSeeders(isUsersEmpty bool) error {
-	empty, err := isTableEmpty("history_of_seeders")
-	if err != nil {
-		log.Printf("Error checking if users table is empty: %v", err)
-		return err
-	}
-
-	if empty && isUsersEmpty {
-		hashSeeder := &model.HistoryOfSeeders{
-			SeederName: "UserPasswordHash",
+// Classify existing credentials before migrating plaintext. SHA-384 digests are
+// irreversible; their plaintext is available only after a successful login.
+// Run in one transaction so a failure cannot leave partially migrated users.
+func runSeeders() error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&model.HistoryOfSeeders{}).Where("seeder_name = ?", "UserPasswordHash").Count(&count).Error; err != nil {
+			return err
 		}
-		return db.Create(hashSeeder).Error
-	} else {
-		var seedersHistory []string
-		db.Model(&model.HistoryOfSeeders{}).Pluck("seeder_name", &seedersHistory)
-
-		if !slices.Contains(seedersHistory, "UserPasswordHash") && !isUsersEmpty {
-			var users []model.User
-			db.Find(&users)
-
-			for _, user := range users {
-				hashedPassword, err := crypto.HashPasswordAsBcrypt(user.Password)
-				if err != nil {
-					log.Printf("Error hashing password for user '%s': %v", user.Username, err)
-					return err
+		var users []model.User
+		if err := tx.Find(&users).Error; err != nil {
+			return err
+		}
+		for _, user := range users {
+			if user.CredentialScheme != "" {
+				if user.CredentialScheme == crypto.CredentialBcrypt && crypto.IsBcryptHash(user.Password) ||
+					user.CredentialScheme == crypto.CredentialSHA384 && crypto.IsSHA384Hash(user.Username) && crypto.IsSHA384Hash(user.Password) {
+					continue
 				}
-				db.Model(&user).Update("password", hashedPassword)
+				return fmt.Errorf("invalid credential format for user ID %d", user.Id)
 			}
-
-			hashSeeder := &model.HistoryOfSeeders{
-				SeederName: "UserPasswordHash",
+			updates := map[string]any{}
+			switch {
+			case crypto.IsBcryptHash(user.Password):
+				updates["credential_scheme"] = crypto.CredentialBcrypt
+			case crypto.IsSHA384Hash(user.Username) && crypto.IsSHA384Hash(user.Password):
+				updates["credential_scheme"] = crypto.CredentialSHA384
+			case count == 0:
+				hash, err := crypto.HashPasswordAsBcrypt(user.Password)
+				if err != nil {
+					return fmt.Errorf("migrate credentials for user ID %d: %w", user.Id, err)
+				}
+				updates["password"] = hash
+				updates["credential_scheme"] = crypto.CredentialBcrypt
+				updates["login_epoch"] = gorm.Expr("login_epoch + 1")
+			default:
+				return fmt.Errorf("unrecognized credential format for user ID %d", user.Id)
 			}
-			return db.Create(hashSeeder).Error
+			if err := tx.Model(&user).Updates(updates).Error; err != nil {
+				return err
+			}
 		}
-	}
-
-	return nil
+		if count == 0 {
+			return tx.Create(&model.HistoryOfSeeders{SeederName: "UserPasswordHash"}).Error
+		}
+		return nil
+	})
 }
 
 // isTableEmpty returns true if the named table contains zero rows.
@@ -147,15 +157,10 @@ func InitDB(dbPath string) error {
 		return err
 	}
 
-	isUsersEmpty, err := isTableEmpty("users")
-	if err != nil {
-		return err
-	}
-
 	if err := initUser(); err != nil {
 		return err
 	}
-	return runSeeders(isUsersEmpty)
+	return runSeeders()
 }
 
 // CloseDB closes the database connection if it exists.

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
+	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
@@ -399,15 +400,29 @@ func (s *Server) Start() (err error) {
 	var listener net.Listener
 	if port == 0 {
 		// 监听 Unix socket
-		socketPath := "/var/run/3x-ui.sock" // 或从配置读取
-		// 如果 socket 文件已存在,先删除
-		os.Remove(socketPath)
+		socketPath := "/var/run/xray/x-ui.sock"
+		if err := os.MkdirAll("/var/run/xray", 0755); err != nil {
+			return err
+		}
+		if info, statErr := os.Lstat(socketPath); statErr == nil {
+			if info.Mode()&os.ModeSocket == 0 {
+				return fmt.Errorf("refusing to replace non-socket file %s", socketPath)
+			}
+			if err := os.Remove(socketPath); err != nil {
+				return err
+			}
+		} else if !os.IsNotExist(statErr) {
+			return statErr
+		}
 		listener, err = net.Listen("unix", socketPath)
 		if err != nil {
 			return err
 		}
 		// 设置 socket 文件权限
-		os.Chmod(socketPath, 0660)
+		if err := os.Chmod(socketPath, 0660); err != nil {
+			listener.Close()
+			return err
+		}
 	} else {
 		// 监听 TCP 端口
 		targetPort := strconv.Itoa(port)
@@ -429,21 +444,21 @@ func (s *Server) Start() (err error) {
 			listener = network.NewAutoHttpsListener(listener)
 			listener = tls.NewListener(listener, c)
 			if port == 0 {
-				logger.Info("Web server running HTTPS on unix socket /var/run/3x-ui.sock")
+				logger.Info("Web server running HTTPS on unix socket", listener.Addr())
 			} else {
 				logger.Info("Web server running HTTPS on", listener.Addr())
 			}
 		} else {
 			logger.Error("Error loading certificates:", err)
 			if port == 0 {
-				logger.Info("Web server running HTTP on unix socket /var/run/3x-ui.sock")
+				logger.Info("Web server running HTTP on unix socket", listener.Addr())
 			} else {
 				logger.Info("Web server running HTTP on", listener.Addr())
 			}
 		}
 	} else {
 		if port == 0 {
-			logger.Info("Web server running HTTP on unix socket /var/run/3x-ui.sock")
+			logger.Info("Web server running HTTP on unix socket", listener.Addr())
 		} else {
 			logger.Info("Web server running HTTP on", listener.Addr())
 		}

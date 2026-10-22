@@ -1,4 +1,5 @@
 "username" = "Nombre de Usuario"
+"loginSecret" = "Clave de acceso anterior"
 "password" = "Contraseña"
 "login" = "Acceder"
 "confirm" = "Confirmar"

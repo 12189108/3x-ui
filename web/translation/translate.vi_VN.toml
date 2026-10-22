@@ -1,4 +1,5 @@
 "username" = "Tên người dùng"
+"loginSecret" = "Khóa đăng nhập cũ"
 "password" = "Mật khẩu"
 "login" = "Đăng nhập"
 "confirm" = "Xác nhận"

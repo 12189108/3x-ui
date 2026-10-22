@@ -1,4 +1,5 @@
 "username" = "Nama Pengguna"
+"loginSecret" = "Kunci masuk lama"
 "password" = "Kata Sandi"
 "login" = "Masuk"
 "confirm" = "Konfirmasi"

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mhsanaei/3x-ui/v2/util/crypto"
 	"github.com/mhsanaei/3x-ui/v2/web/entity"
 	"github.com/mhsanaei/3x-ui/v2/web/service"
 	"github.com/mhsanaei/3x-ui/v2/web/session"
@@ -100,7 +99,7 @@ func (a *SettingController) updateUser(c *gin.Context) {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	if user.Username != form.OldUsername || !crypto.CheckPasswordHash(user.Password, form.OldPassword) {
+	if !service.MatchLocalCredentials(user, form.OldUsername, form.OldPassword) {
 		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifyUserError"), errors.New(I18nWeb(c, "pages.settings.toasts.originalUserPassIncorrect")))
 		return
 	}

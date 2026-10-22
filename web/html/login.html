@@ -73,6 +73,12 @@
                         <a-icon slot="prefix" type="lock" class="fs-1rem"></a-icon>
                       </a-input-password>
                     </a-form-item>
+                    <a-form-item v-if="loginSecretEnable">
+                      <a-input-password autocomplete="off" name="loginSecret" v-model="user.loginSecret"
+                        placeholder='{{ i18n "loginSecret" }}' required>
+                        <a-icon slot="prefix" type="key" class="fs-1rem"></a-icon>
+                      </a-input-password>
+                    </a-form-item>
                     <a-form-item v-if="twoFactorEnable">
                       <a-input autocomplete="one-time-code" name="twoFactorCode" v-model.trim="user.twoFactorCode"
                         placeholder='{{ i18n "twoFactorCode" }}' required>
@@ -109,7 +115,8 @@
     data: {
       themeSwitcher,
       loadingStates: { fetched: false, spinning: false },
-      user: { username: "", password: "", twoFactorCode: "" },
+      user: { username: "", password: "", twoFactorCode: "", loginSecret: "" },
+      loginSecretEnable: false,
       twoFactorEnable: false,
       lang: "",
       animationStarted: false
@@ -117,6 +124,8 @@
     async mounted() {
       this.lang = LanguageManager.getLanguage();
       this.twoFactorEnable = await this.getTwoFactorEnable();
+      const secretStatus = await HttpUtil.post('/getLoginSecretEnable');
+      this.loginSecretEnable = secretStatus.success && secretStatus.obj;
     },
     methods: {
       async login() {
